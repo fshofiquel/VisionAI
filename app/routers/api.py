@@ -31,11 +31,11 @@ router = APIRouter(prefix="/images", tags=["images"])
 
 @router.post("/upload", response_model=ImageUploadResponse, status_code=201)
 async def upload_image(
-    file: UploadFile = File(...),
-    description: str | None = Form(default=None),
-    db: Session = Depends(get_db),
-    vision_svc: VisionService = Depends(get_vision_service),
-    ollama_embed_svc: OllamaEmbeddingService = Depends(get_ollama_embedding_service),
+        file: UploadFile = File(...),
+        description: str | None = Form(default=None),
+        db: Session = Depends(get_db),
+        vision_svc: VisionService = Depends(get_vision_service),
+        ollama_embed_svc: OllamaEmbeddingService = Depends(get_ollama_embedding_service),
 ):
     """
     Upload an image with automatic AI processing.
@@ -105,11 +105,11 @@ async def upload_image(
 
 @router.get("/search/text", response_model=SearchResponse)
 def search_by_text(
-    q: str = Query(..., min_length=1, max_length=500),
-    limit: int = Query(default=10, ge=1, le=100),
-    min_score: float = Query(default=0.0, ge=0.0, le=1.0),
-    db: Session = Depends(get_db),
-    ollama_embed_svc: OllamaEmbeddingService = Depends(get_ollama_embedding_service),
+        q: str = Query(..., min_length=1, max_length=500),
+        limit: int = Query(default=10, ge=1, le=100),
+        min_score: float = Query(default=0.0, ge=0.0, le=1.0),
+        db: Session = Depends(get_db),
+        ollama_embed_svc: OllamaEmbeddingService = Depends(get_ollama_embedding_service),
 ):
     """
     Search images using natural language queries.
