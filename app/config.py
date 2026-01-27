@@ -15,5 +15,9 @@ class Settings(BaseSettings):
     clip_model_name: str = "clip-ViT-B-32"
     embedding_dimension: int = 512
 
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_api_key: str = ""
+    ollama_model: str = "llava:latest"
+
 
 settings = Settings()

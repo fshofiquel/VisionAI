@@ -5,7 +5,7 @@ from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, get_embedding_service
+from app.dependencies import get_db, get_embedding_service, get_llava_service
 from app.models.image import Image
 from app.schemas.image import (
     ImageResponse,
@@ -15,6 +15,7 @@ from app.schemas.image import (
 )
 from app.services.embedding import EmbeddingService
 from app.services.image_storage import delete_file, save_to_disk, validate_image
+from app.services.llava import LLaVAService
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -25,6 +26,7 @@ async def upload_image(
     description: str | None = Form(default=None),
     db: Session = Depends(get_db),
     embedding_svc: EmbeddingService = Depends(get_embedding_service),
+    llava_svc: LLaVAService = Depends(get_llava_service),
 ):
     content = await file.read()
 
@@ -38,6 +40,12 @@ async def upload_image(
         embedding = embedding_svc.embed_image(pil_image)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to process image: {e}")
+
+    if description is None:
+        try:
+            description = llava_svc.describe_image(pil_image)
+        except Exception:
+            pass
 
     stored_filename, filepath, file_size = save_to_disk(
         content, file.filename, file.content_type
