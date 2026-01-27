@@ -9,3 +9,6 @@
 /.claude/
 /__pycache__/
 /bulk_describe.py
+/bulk_embed_descriptions.py
+/check_ollama_embeddings.py
+/migrate_add_description_embedding.py

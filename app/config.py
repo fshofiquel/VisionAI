@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_api_key: str = ""
     ollama_model: str = "llava:latest"
+    ollama_embedding_model: str = "llama3.1:latest"
+    ollama_embedding_dimension: int = 4096
 
 
 settings = Settings()
