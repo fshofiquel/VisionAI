@@ -1,0 +1,10 @@
+/download_images.py
+/downloads/
+/unsplash-research-dataset-lite-latest/
+/uploads/
+/.env
+/bulk_import.py
+/test_main.http
+/.idea/
+/.claude/
+/__pycache__/
