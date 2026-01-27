@@ -4,6 +4,7 @@ Handles image processing with AI-generated descriptions and semantic search.
 """
 
 import io
+import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from PIL import Image as PILImage
@@ -21,6 +22,8 @@ from app.schemas.api_schemas import (
 from app.services.storage import delete_file, save_to_disk, validate_image
 from app.services.vision import VisionService
 from app.services.ollama_embedding import OllamaEmbeddingService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -63,16 +66,16 @@ async def upload_image(
     if description is None:
         try:
             description = vision_svc.describe_image(pil_image)
-        except Exception:
-            pass  # Continue without description if vision model fails
+        except Exception as e:
+            logger.warning("Vision model failed for %s: %s", file.filename, e)
 
     # Generate embedding from description for semantic search
     embedding = None
     if description:
         try:
             embedding = ollama_embed_svc.embed_text(description)
-        except Exception:
-            pass  # Continue without embedding if it fails
+        except Exception as e:
+            logger.warning("Embedding failed for %s: %s", file.filename, e)
 
     # Save file to disk
     stored_filename, filepath, file_size = save_to_disk(
@@ -107,19 +110,21 @@ async def upload_image(
 def search_by_text(
         q: str = Query(..., min_length=1, max_length=500),
         limit: int = Query(default=10, ge=1, le=100),
-        min_score: float = Query(default=0.0, ge=0.0, le=1.0),
+        min_score: float = Query(default=0.15, ge=0.0, le=1.0, description="Minimum similarity score (0-1). Default 0.15 filters low-relevance results."),
         db: Session = Depends(get_db),
         ollama_embed_svc: OllamaEmbeddingService = Depends(get_ollama_embedding_service),
 ):
     """
     Search images using natural language queries.
 
-    The query text is embedded using llama3.1 and compared against
+    The query text is embedded using LLaVA/CLIP and compared against
     stored description embeddings using cosine similarity.
     Higher scores indicate more relevant matches.
+    Results are boosted if the query terms appear in the description.
     """
     # Embed the search query
     query_embedding = ollama_embed_svc.embed_text(q)
+    query_lower = q.lower()
 
     # Find similar images using pgvector cosine distance
     results = db.execute(
@@ -129,21 +134,37 @@ def search_by_text(
         )
         .where(Image.embedding.isnot(None))
         .order_by(Image.embedding.cosine_distance(query_embedding))
-        .limit(limit)
+        .limit(limit * 2)  # Fetch extra for re-ranking
     ).all()
 
-    # Filter by minimum score and format results
+    # Calculate boosted scores (boost if query terms appear in description)
+    scored_results = []
+    for row in results:
+        base_score = float(row.score)
+        description_lower = (row.Image.description or "").lower()
+
+        # Boost score by 0.1 if query appears in description
+        boost = 0.1 if query_lower in description_lower else 0.0
+        final_score = min(base_score + boost, 1.0)  # Cap at 1.0
+
+        if final_score >= min_score:
+            scored_results.append((row.Image, final_score))
+
+    # Sort by boosted score and limit results
+    scored_results.sort(key=lambda x: x[1], reverse=True)
+    scored_results = scored_results[:limit]
+
+    # Format results
     search_results = [
         ImageSearchResult(
-            id=row.Image.id,
-            filename=row.Image.filename,
-            original_filename=row.Image.original_filename,
-            filepath=row.Image.filepath,
-            description=row.Image.description,
-            score=round(float(row.score), 4),
+            id=img.id,
+            filename=img.filename,
+            original_filename=img.original_filename,
+            filepath=img.filepath,
+            description=img.description,
+            score=round(score, 4),
         )
-        for row in results
-        if float(row.score) >= min_score
+        for img, score in scored_results
     ]
 
     return SearchResponse(query=q, results=search_results, total=len(search_results))

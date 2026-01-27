@@ -2,17 +2,10 @@
 Converts text descriptions into vector embeddings using llama3.1.
 """
 
-import time
-
 import numpy as np
-import requests
 
 from app.config import settings
-
-# Request configuration
-TIMEOUT = 120  # Maximum seconds to wait for API response
-MAX_RETRIES = 3  # Number of retry attempts on failure
-RETRY_DELAY = 5  # Seconds to wait between retries
+from app.services.http_client import post_with_retry
 
 
 class OllamaEmbeddingService:
@@ -30,14 +23,6 @@ class OllamaEmbeddingService:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-
-    @property
-    def _headers(self) -> dict[str, str]:
-        """Build request headers, including auth if API key is configured."""
-        headers = {"Content-Type": "application/json"}
-        if settings.ollama_api_key:
-            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-        return headers
 
     def embed_text(self, text: str) -> list[float]:
         """
@@ -57,30 +42,16 @@ class OllamaEmbeddingService:
             "prompt": text,
         }
 
-        for attempt in range(MAX_RETRIES):
-            try:
-                resp = requests.post(
-                    f"{settings.ollama_base_url}/api/embeddings",
-                    json=payload,
-                    headers=self._headers,
-                    timeout=TIMEOUT,
-                )
-                resp.raise_for_status()
-                embedding = resp.json()["embedding"]
+        response = post_with_retry("/api/embeddings", payload, "Embedding")
+        embedding = response["embedding"]
 
-                # L2 normalize for consistent cosine similarity
-                embedding = np.array(embedding)
-                norm = np.linalg.norm(embedding)
-                if norm > 0:
-                    embedding = embedding / norm
+        # L2 normalize for consistent cosine similarity
+        embedding = np.array(embedding)
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
 
-                return embedding.tolist()
-            except (requests.Timeout, requests.ConnectionError):
-                if attempt == MAX_RETRIES - 1:
-                    raise
-                time.sleep(RETRY_DELAY)
-
-        raise RuntimeError("Failed to get embedding after retries")
+        return embedding.tolist()
 
     def embed_texts_batch(self, texts: list[str]) -> list[list[float]]:
         """

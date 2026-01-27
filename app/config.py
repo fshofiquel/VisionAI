@@ -30,13 +30,13 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_api_key: str = ""
 
-    # Vision model for generating image descriptions (e.g., llava, qwen2.5vl)
+    # Vision model for generating image descriptions
     ollama_model: str = "qwen2.5vl:latest"
 
-    # Text embedding model for semantic search
-    ollama_embedding_model: str = "llama3.1:latest"
+    # Embedding model for semantic search (llava has CLIP, optimized for similarity)
+    ollama_embedding_model: str = "llava:latest"
 
-    # Dimension of embedding vectors (must match the model's output)
+    # Dimension of embedding vectors (llava:latest outputs 4096)
     ollama_embedding_dimension: int = 4096
 
 
