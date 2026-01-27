@@ -18,8 +18,7 @@ class Image(Base):
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    embedding = mapped_column(Vector(settings.embedding_dimension), nullable=False)
-    description_embedding = mapped_column(
+    embedding = mapped_column(
         Vector(settings.ollama_embedding_dimension), nullable=True
     )
     created_at: Mapped[datetime.datetime] = mapped_column(

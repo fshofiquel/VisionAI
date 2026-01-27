@@ -10,13 +10,17 @@ from app.config import settings
 TIMEOUT = 120
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-MAX_IMAGE_SIZE = 512
+MAX_IMAGE_SIZE = 384  # Reduced for faster processing (was 512)
+
+# Prompt optimized for speed while still searchable
+DESCRIPTION_PROMPT = "What is in this image? Describe briefly."
 
 
-class LLaVAService:
-    _instance: "LLaVAService | None" = None
+class VisionService:
+    """Vision model service for image descriptions (supports LLaVA, Qwen2.5-VL, etc.)"""
+    _instance: "VisionService | None" = None
 
-    def __new__(cls) -> "LLaVAService":
+    def __new__(cls) -> "VisionService":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -37,11 +41,14 @@ class LLaVAService:
 
         payload = {
             "model": settings.ollama_model,
-            "prompt": "Briefly describe this image in one sentence.",
+            "prompt": DESCRIPTION_PROMPT,
             "images": [image_b64],
             "stream": False,
+            "keep_alive": "30m",  # Keep model loaded between requests
             "options": {
-                "num_predict": 80,
+                "num_predict": 60,
+                "temperature": 0.0,
+                "num_ctx": 2048,
             },
         }
 
@@ -61,4 +68,4 @@ class LLaVAService:
                 time.sleep(RETRY_DELAY)
 
 
-llava_service = LLaVAService()
+vision_service = VisionService()

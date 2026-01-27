@@ -1,7 +1,7 @@
 [project]
 name = "visionai"
 version = "0.1.0"
-description = "AI-powered image search backend using CLIP embeddings and pgvector"
+description = "AI-powered image search backend using LLaVA descriptions and Ollama embeddings with pgvector"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi[standard]>=0.128.0",
@@ -9,16 +9,10 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.1",
     "pgvector>=0.3",
-    "sentence-transformers>=3.0",
     "Pillow>=10.0",
     "pydantic-settings>=2.0",
     "python-multipart>=0.0.9",
     "requests>=2.31",
-    "torch>=2.0",
-    "transformers>=4.34",
-    "huggingface-hub>=0.19",
     "numpy>=1.26",
-    "scikit-learn>=1.3",
-    "scipy>=1.11",
     "tqdm>=4.65",
 ]

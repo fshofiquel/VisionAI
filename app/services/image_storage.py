@@ -32,7 +32,7 @@ def validate_image(content: bytes, content_type: str | None) -> None:
         raise ValueError("Empty file uploaded.")
 
 
-def save_to_disk(content: bytes, original_filename: str | None, content_type: str | None) -> tuple[str, str, int]:
+def save_to_disk(content: bytes, original_filename: str | None) -> tuple[str, str, int]:
     """Save image bytes to disk.
 
     Returns:

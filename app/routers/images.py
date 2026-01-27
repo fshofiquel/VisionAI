@@ -4,8 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from app.dependencies import get_db, get_embedding_service, get_llava_service, get_ollama_embedding_service
+from app.dependencies import get_db, get_vision_service, get_ollama_embedding_service
 from app.models.image import Image
 from app.schemas.image import (
     ImageResponse,
@@ -13,9 +12,8 @@ from app.schemas.image import (
     ImageUploadResponse,
     SearchResponse,
 )
-from app.services.embedding import EmbeddingService
 from app.services.image_storage import delete_file, save_to_disk, validate_image
-from app.services.llava import LLaVAService
+from app.services.vision import VisionService
 from app.services.ollama_embedding import OllamaEmbeddingService
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -26,10 +24,10 @@ async def upload_image(
     file: UploadFile = File(...),
     description: str | None = Form(default=None),
     db: Session = Depends(get_db),
-    embedding_svc: EmbeddingService = Depends(get_embedding_service),
-    llava_svc: LLaVAService = Depends(get_llava_service),
+    vision_svc: VisionService = Depends(get_vision_service),
     ollama_embed_svc: OllamaEmbeddingService = Depends(get_ollama_embedding_service),
 ):
+    """Upload an image, generate description with vision model, and create embedding."""
     content = await file.read()
 
     try:
@@ -39,26 +37,26 @@ async def upload_image(
 
     try:
         pil_image = PILImage.open(io.BytesIO(content)).convert("RGB")
-        embedding = embedding_svc.embed_image(pil_image)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to process image: {e}")
 
+    # Generate description with vision model if not provided
     if description is None:
         try:
-            description = llava_svc.describe_image(pil_image)
+            description = vision_svc.describe_image(pil_image)
         except Exception:
             pass
 
-    # Generate description embedding if we have a description
-    description_embedding = None
+    # Generate embedding from description using Ollama
+    embedding = None
     if description:
         try:
-            description_embedding = ollama_embed_svc.embed_text(description)
+            embedding = ollama_embed_svc.embed_text(description)
         except Exception:
-            pass  # Continue without description embedding if it fails
+            pass  # Continue without embedding if it fails
 
     stored_filename, filepath, file_size = save_to_disk(
-        content, file.filename, file.content_type
+        content, file.filename
     )
 
     db_image = Image(
@@ -69,7 +67,6 @@ async def upload_image(
         file_size=file_size,
         description=description,
         embedding=embedding,
-        description_embedding=description_embedding,
     )
     db.add(db_image)
     db.commit()
@@ -96,14 +93,14 @@ def search_by_text(
     """
     query_embedding = ollama_embed_svc.embed_text(q)
 
-    # Search against description embeddings (text-to-text matching)
+    # Search against embeddings (text-to-text matching)
     results = db.execute(
         select(
             Image,
-            (1 - Image.description_embedding.cosine_distance(query_embedding)).label("score"),
+            (1 - Image.embedding.cosine_distance(query_embedding)).label("score"),
         )
-        .where(Image.description_embedding.isnot(None))
-        .order_by(Image.description_embedding.cosine_distance(query_embedding))
+        .where(Image.embedding.isnot(None))
+        .order_by(Image.embedding.cosine_distance(query_embedding))
         .limit(limit)
     ).all()
 
@@ -121,44 +118,6 @@ def search_by_text(
     ]
 
     return SearchResponse(query=q, results=search_results, total=len(search_results))
-
-
-@router.post("/search/image", response_model=SearchResponse)
-async def search_by_image(
-    file: UploadFile = File(...),
-    limit: int = Query(default=10, ge=1, le=100),
-    db: Session = Depends(get_db),
-    embedding_svc: EmbeddingService = Depends(get_embedding_service),
-):
-    try:
-        content = await file.read()
-        pil_image = PILImage.open(io.BytesIO(content)).convert("RGB")
-        query_embedding = embedding_svc.embed_image(pil_image)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Failed to process image: {e}")
-
-    results = db.execute(
-        select(
-            Image,
-            (1 - Image.embedding.cosine_distance(query_embedding)).label("score"),
-        )
-        .order_by(Image.embedding.cosine_distance(query_embedding))
-        .limit(limit)
-    ).all()
-
-    search_results = [
-        ImageSearchResult(
-            id=row.Image.id,
-            filename=row.Image.filename,
-            original_filename=row.Image.original_filename,
-            filepath=row.Image.filepath,
-            description=row.Image.description,
-            score=round(float(row.score), 4),
-        )
-        for row in results
-    ]
-
-    return SearchResponse(query="[image upload]", results=search_results, total=len(search_results))
 
 
 @router.get("/{image_id}", response_model=ImageResponse)
