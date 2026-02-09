@@ -31,9 +31,10 @@ class Settings(BaseSettings):
     ollama_api_key: str = ""
 
     # Vision model for generating image descriptions
-    ollama_model: str = "qwen2.5vl:latest"
+    ollama_model: str = "llava:latest"
 
-    # Embedding model for semantic search (llava has CLIP, optimized for similarity)
+    # Embedding model for semantic search
+    # Using llava:latest which has CLIP - designed for semantic similarity
     ollama_embedding_model: str = "llava:latest"
 
     # Dimension of embedding vectors (llava:latest outputs 4096)

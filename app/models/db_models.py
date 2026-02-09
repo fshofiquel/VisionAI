@@ -6,7 +6,7 @@ Stores image metadata and description embeddings for semantic search.
 import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.config import settings
@@ -36,10 +36,17 @@ class Image(Base):
     # AI-generated description from vision model (LLaVA/Qwen2.5-VL)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Vector embedding of the description for semantic search
+    # AI-extracted keywords from description (used for embedding, not full description)
+    search_keywords: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Vector embedding of search_keywords for semantic search
     embedding = mapped_column(
         Vector(settings.ollama_embedding_dimension), nullable=True
     )
+
+    # Baseline similarity score - image's similarity to a generic query
+    # Used to normalize search results (prevents generic images from dominating)
+    baseline_score: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     # Timestamp of when the image was added
     created_at: Mapped[datetime.datetime] = mapped_column(

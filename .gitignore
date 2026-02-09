@@ -7,6 +7,3 @@
 /__pycache__/
 *.pyc
 /test_main.http
-/migrate_reset_schema.py
-/bulk_import_ollama.py
-/download_images.py

@@ -33,6 +33,7 @@ class ImageSearchResult(BaseModel):
     original_filename: str
     filepath: str
     description: str | None
+    search_keywords: str | None = None  # Keywords that were matched
     score: float  # Cosine similarity score (0-1, higher = more similar)
 
 
