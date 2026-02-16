@@ -1,27 +1,66 @@
-"""Ollama embedding service for text-based semantic search.
-Converts text descriptions into vector embeddings.
-Includes caching for fast repeated search queries.
+"""
+Ollama embedding service for semantic search.
+
+This module provides text-to-vector embedding functionality using Ollama's
+embedding API. Embeddings are used to enable semantic similarity search
+across image descriptions.
+
+Key features:
+- L2 normalization for consistent cosine similarity calculations
+- In-memory caching for fast repeated queries
+- Singleton pattern for efficient resource usage
+
+Example:
+    service = OllamaEmbeddingService()
+    embedding = service.embed_text("a photo of a sunset")
+    # Returns: [0.023, -0.156, 0.089, ...] (4096 floats)
 """
 
 import hashlib
+from typing import Final
 
 import numpy as np
 
 from app.config import settings
 from app.services.http_client import post_with_retry
 
-# In-memory cache for query embeddings (makes repeated searches instant)
-_embedding_cache: dict[str, list[float]] = {}
-_CACHE_MAX_SIZE = 1000
+# =============================================================================
+# Configuration
+# =============================================================================
 
+# Maximum number of cached embeddings (LRU-style eviction when exceeded)
+_CACHE_MAX_SIZE: Final[int] = 1000
+
+# Number of entries to evict when cache is full
+_CACHE_EVICTION_COUNT: Final[int] = 100
+
+# In-memory cache for query embeddings {hash -> embedding}
+_embedding_cache: dict[str, list[float]] = {}
+
+
+# =============================================================================
+# Embedding Service
+# =============================================================================
 
 class OllamaEmbeddingService:
     """
     Service for generating text embeddings via Ollama API.
 
-    Uses a singleton pattern to reuse the same instance across requests.
-    Embeddings are L2-normalized for consistent cosine similarity calculations.
-    Query embeddings are cached for fast repeated searches.
+    Converts text strings into dense vector representations that capture
+    semantic meaning. These vectors enable similarity search by comparing
+    distances in the embedding space.
+
+    Features:
+        - Singleton pattern: Only one instance exists application-wide
+        - L2 normalization: All embeddings are unit vectors for cosine similarity
+        - Caching: Query embeddings are cached for instant repeated searches
+
+    Attributes:
+        _instance: Class-level singleton instance
+
+    Example:
+        service = OllamaEmbeddingService()
+        vec = service.embed_text("sunset over mountains")
     """
 
     _instance: "OllamaEmbeddingService | None" = None
@@ -36,55 +75,80 @@ class OllamaEmbeddingService:
         """
         Generate a vector embedding for the given text.
 
+        The embedding is L2-normalized to unit length, ensuring consistent
+        cosine similarity calculations regardless of text length.
+
         Args:
             text: The text to embed (description or search query)
-            use_cache: If True, check/store in cache (use for search queries)
+            use_cache: If True, check cache first and store result.
+                      Set False for indexing operations.
 
         Returns:
-            L2-normalized embedding vector as a list of floats
+            L2-normalized embedding vector as a list of floats.
+            Length matches OLLAMA_EMBEDDING_DIMENSION config.
 
         Raises:
             RuntimeError: If embedding fails after all retries
         """
-        # Check cache first (instant for repeated queries)
+        # Generate cache key from text hash
         cache_key = hashlib.md5(text.encode()).hexdigest()
+
+        # Return cached embedding if available
         if use_cache and cache_key in _embedding_cache:
             return _embedding_cache[cache_key]
 
-        # Call Ollama API
+        # Call Ollama embedding API
         payload = {
             "model": settings.ollama_embedding_model,
             "prompt": text,
         }
-
         response = post_with_retry("/api/embeddings", payload, "Embedding")
         embedding = response["embedding"]
 
         # L2 normalize for consistent cosine similarity
-        embedding = np.array(embedding)
-        norm = np.linalg.norm(embedding)
+        embedding_array = np.array(embedding)
+        norm = np.linalg.norm(embedding_array)
         if norm > 0:
-            embedding = embedding / norm
+            embedding_array = embedding_array / norm
 
-        result = embedding.tolist()
+        result = embedding_array.tolist()
 
-        # Cache the result (evict old entries if full)
+        # Cache the result with simple LRU-style eviction
         if use_cache:
-            if len(_embedding_cache) >= _CACHE_MAX_SIZE:
-                # Simple eviction: remove first 100 entries
-                keys_to_remove = list(_embedding_cache.keys())[:100]
-                for key in keys_to_remove:
-                    del _embedding_cache[key]
-            _embedding_cache[cache_key] = result
+            self._cache_embedding(cache_key, result)
 
         return result
 
+    def _cache_embedding(self, cache_key: str, embedding: list[float]) -> None:
+        """
+        Store an embedding in the cache with overflow handling.
+
+        Evicts oldest entries when cache exceeds maximum size.
+
+        Args:
+            cache_key: Hash key for the embedding
+            embedding: Vector to cache
+        """
+        if len(_embedding_cache) >= _CACHE_MAX_SIZE:
+            # Evict oldest entries (dict maintains insertion order in Python 3.7+)
+            keys_to_remove = list(_embedding_cache.keys())[:_CACHE_EVICTION_COUNT]
+            for key in keys_to_remove:
+                del _embedding_cache[key]
+
+        _embedding_cache[cache_key] = embedding
+
     def embed_texts_batch(self, texts: list[str]) -> list[list[float]]:
         """
-        Generate embeddings for multiple texts (for indexing, not search).
+        Generate embeddings for multiple texts.
 
-        Note: Ollama API doesn't support true batching, so this processes sequentially.
-        Caching disabled for batch operations.
+        Processes texts sequentially since Ollama API doesn't support
+        true batching. Caching is disabled for batch operations.
+
+        Args:
+            texts: List of text strings to embed
+
+        Returns:
+            List of embedding vectors, one per input text
         """
         return [self.embed_text(text, use_cache=False) for text in texts]
 
