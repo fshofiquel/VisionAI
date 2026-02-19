@@ -19,6 +19,7 @@ This achieves 86% high-confidence matches in testing.
 
 import io
 import logging
+import re
 from typing import Annotated, Final
 
 import numpy as np
@@ -49,7 +50,10 @@ router = APIRouter(prefix="/images", tags=["images"])
 # =============================================================================
 
 # Maximum keyword boost added to vector similarity score
-MAX_KEYWORD_BOOST: Final[float] = 0.5
+MAX_KEYWORD_BOOST: Final[float] = 0.8
+
+# Minimum boost when at least one keyword matches (prevents dilution in verbose queries)
+MIN_KEYWORD_BOOST: Final[float] = 0.4
 
 # Multiplier for fetch limit (fetch more candidates for re-ranking)
 FETCH_LIMIT_MULTIPLIER: Final[int] = 5
@@ -59,6 +63,61 @@ MAX_FETCH_LIMIT: Final[int] = 100
 
 # Maximum keyword matches to fetch per keyword
 KEYWORD_MATCH_LIMIT: Final[int] = 20
+
+# Common word variants/synonyms mapped to their canonical form
+# This helps match informal terms like "doggy" to "dog" in descriptions
+WORD_SYNONYMS: Final[dict[str, str]] = {
+    # Animals - informal to formal
+    "doggy": "dog",
+    "doggie": "dog",
+    "puppy": "dog",
+    "pup": "dog",
+    "kitty": "cat",
+    "kitten": "cat",
+    "kittycat": "cat",
+    "birdie": "bird",
+    "bunny": "rabbit",
+    "horsie": "horse",
+    "fishy": "fish",
+    "fishes": "fish",
+    "ducky": "duck",
+    "duckling": "duck",
+    "piggy": "pig",
+    "piglet": "pig",
+    "mousey": "mouse",
+    "mice": "mouse",
+    "goose": "geese",
+    "wolfy": "wolf",
+    "foxy": "fox",
+    "deery": "deer",
+    # Nature
+    "sunny": "sun",
+    "rainy": "rain",
+    "snowy": "snow",
+    "cloudy": "cloud",
+    "foggy": "fog",
+    "misty": "mist",
+    "grassy": "grass",
+    "leafy": "leaf",
+    # Common plurals that might not match
+    "dogs": "dog",
+    "cats": "cat",
+    "birds": "bird",
+    "horses": "horse",
+    "trees": "tree",
+    "flowers": "flower",
+    "mountains": "mountain",
+    "beaches": "beach",
+    "waves": "wave",
+    "rocks": "rock",
+    "clouds": "cloud",
+    "stars": "star",
+    "leaves": "leaf",
+    "people": "person",
+    "persons": "person",
+    "children": "child",
+    "kids": "child",
+}
 
 # Stop words to filter out when extracting keywords
 STOP_WORDS: Final[frozenset[str]] = frozenset({
@@ -197,7 +256,8 @@ def _extract_keywords(query: str) -> list[str]:
     Extract meaningful keywords from a search query.
 
     Filters out stop words and short terms to identify the most
-    important search terms for keyword boosting.
+    important search terms for keyword boosting. Also normalizes
+    synonyms (e.g., "doggy" -> includes both "doggy" and "dog").
 
     Args:
         query: User's search query string
@@ -206,18 +266,27 @@ def _extract_keywords(query: str) -> list[str]:
         List of lowercase keywords (2+ characters, no stop words)
 
     Example:
-        >>> _extract_keywords("a cute dog in the park")
-        ['cute', 'dog', 'park']
+        >>> _extract_keywords("a cute doggy in the park")
+        ['cute', 'doggy', 'dog', 'park']
     """
     words = query.lower().split()
     keywords = []
+    seen = set()
 
     for word in words:
         # Remove punctuation from word boundaries
         cleaned = word.strip('.,!?;:()[]{}"\'-')
         # Keep if not a stop word and has sufficient length
         if cleaned not in STOP_WORDS and len(cleaned) >= 2:
-            keywords.append(cleaned)
+            if cleaned not in seen:
+                keywords.append(cleaned)
+                seen.add(cleaned)
+
+            # Also add the canonical form if this is a synonym
+            canonical = WORD_SYNONYMS.get(cleaned)
+            if canonical and canonical not in seen:
+                keywords.append(canonical)
+                seen.add(canonical)
 
     return keywords
 
@@ -226,36 +295,58 @@ def _calculate_keyword_boost(description: str, keywords: list[str]) -> float:
     """
     Calculate a relevance boost based on keyword presence in description.
 
-    Provides a score bonus when search keywords appear in the image
-    description. This ensures images with exact keyword matches rank
-    higher than those with only semantic similarity.
+    Uses word boundary matching to ensure whole words are matched,
+    avoiding false positives like "car" matching "cartoon".
+
+    Gives EXTRA boost when keywords appear in the first sentence,
+    as that typically describes the main subject of the image.
 
     Args:
         description: Image description to search within
         keywords: List of keywords extracted from search query
 
     Returns:
-        Boost value between 0.0 and MAX_KEYWORD_BOOST (0.5).
-        Full boost is applied when all keywords are found.
-
-    Example:
-        >>> _calculate_keyword_boost("A cute dog in the park", ["dog", "park"])
-        0.5  # Both keywords found
-        >>> _calculate_keyword_boost("A cute dog in the park", ["dog", "cat"])
-        0.25  # One of two keywords found
+        Boost value between 0.0 and MAX_KEYWORD_BOOST (0.8).
+        Extra boost when keyword is in first sentence (primary subject).
     """
     if not description or not keywords:
         return 0.0
 
     desc_lower = description.lower()
-    matches = sum(1 for kw in keywords if kw in desc_lower)
 
-    if matches == 0:
+    # Split into first sentence and rest for primary subject detection
+    # First sentence usually describes the main subject
+    first_sentence_end = desc_lower.find('.')
+    if first_sentence_end == -1:
+        first_sentence = desc_lower
+        rest_of_desc = ""
+    else:
+        first_sentence = desc_lower[:first_sentence_end]
+        rest_of_desc = desc_lower[first_sentence_end:]
+
+    primary_matches = 0  # Matches in first sentence (main subject)
+    secondary_matches = 0  # Matches elsewhere (mentioned in passing)
+
+    for kw in keywords:
+        pattern = rf'\b{re.escape(kw)}\b'
+        if re.search(pattern, first_sentence):
+            primary_matches += 1
+        elif re.search(pattern, rest_of_desc):
+            secondary_matches += 1
+
+    total_matches = primary_matches + secondary_matches
+    if total_matches == 0:
         return 0.0
 
-    # Boost proportional to keyword matches, capped at MAX_KEYWORD_BOOST
-    match_ratio = matches / len(keywords)
-    return min(MAX_KEYWORD_BOOST, match_ratio * MAX_KEYWORD_BOOST)
+    # Primary matches (first sentence) get full weight
+    # Secondary matches (mentioned later) get reduced weight (0.3x)
+    weighted_matches = primary_matches + (secondary_matches * 0.3)
+    match_ratio = weighted_matches / len(keywords)
+
+    # Apply minimum floor and scale
+    scaled_boost = MIN_KEYWORD_BOOST + (match_ratio * (MAX_KEYWORD_BOOST - MIN_KEYWORD_BOOST))
+
+    return min(MAX_KEYWORD_BOOST, scaled_boost)
 
 
 @router.get("/search/text", response_model=SearchResponse)
