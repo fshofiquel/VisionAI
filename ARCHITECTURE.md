@@ -31,17 +31,17 @@ VisionAI is a semantic image search engine that bridges the gap between visual c
 
 ### Technology Stack
 
-| Component       | Technology               | Purpose                              |
-|-----------------|--------------------------|--------------------------------------|
-| Web Framework   | FastAPI                  | REST API with automatic OpenAPI docs |
-| Database        | PostgreSQL + pgvector    | Vector similarity search             |
-| ORM             | SQLAlchemy 2.0           | Database abstraction                 |
-| Vision Model    | LLaVA (via Ollama)       | Image description generation         |
-| Embedding Model | Llama 3.1 (via Ollama)   | Text-to-vector conversion            |
-| Validation      | Pydantic                 | Request/response validation          |
-| Frontend        | React 19 + TypeScript    | User interface                       |
-| Build Tool      | Vite                     | Frontend bundling and dev server     |
-| Testing         | Vitest + Testing Library | Frontend unit tests                  |
+| Component       | Technology             | Purpose                              |
+|-----------------|------------------------|--------------------------------------|
+| Web Framework   | FastAPI                | REST API with automatic OpenAPI docs |
+| Database        | PostgreSQL + pgvector  | Vector similarity search             |
+| ORM             | SQLAlchemy 2.0         | Database abstraction                 |
+| Vision Model    | LLaVA (via Ollama)     | Image description generation         |
+| Embedding Model | Llama 3.1 (via Ollama) | Text-to-vector conversion            |
+| Validation      | Pydantic               | Request/response validation          |
+| Frontend        | React 19 + TypeScript  | User interface                       |
+| Build Tool      | Vite                   | Frontend bundling and dev server     |
+| Testing         | Vitest + Testing Library | Frontend unit tests                |
 
 ---
 
@@ -51,11 +51,11 @@ VisionAI is a semantic image search engine that bridges the gap between visual c
 
 ```mermaid
 graph LR
-    FE["React Frontend\n:5173"]
-    BE["FastAPI\n:8000"]
+    FE["React Frontend<br/>:5173"]
+    BE["FastAPI<br/>:8000"]
     SVC["Service Layer"]
     DATA["Data Layer"]
-    OLLAMA["Ollama\n:11434"]
+    OLLAMA["Ollama<br/>:11434"]
 
     FE -->|"Vite proxy"| BE
     BE --> SVC
@@ -70,7 +70,7 @@ graph LR
     SP[SearchPage] -->|search query| AC
     UP[UploadPage] -->|file + description| AC
     IC[ImageCard] -->|renders results from| AC
-    AC["api/client.ts\nAPI Client"]
+    AC["api/client.ts<br/>API Client"]
     AC -->|"/api/v1/*"| BE["FastAPI :8000"]
 ```
 
@@ -78,7 +78,7 @@ graph LR
 
 ```mermaid
 graph TB
-    APP["app/__init__.py\nApplication Factory"] --> ROUTER
+    APP["app/__init__.py<br/>Application Factory"] --> ROUTER
 
     ROUTER["routers/api.py"]
     ROUTER --> R1["POST /api/v1/images/upload"]
@@ -89,9 +89,9 @@ graph TB
     R1 & R2 & R3 & R4 --> DEP
 
     subgraph Support["Supporting Modules"]
-        DEP["dependencies.py\nget_db · get_vision_svc · get_embed_svc"]
-        SCHEMAS["schemas/api_schemas.py\nImageResponse · SearchResponse · ImageUpload"]
-        MODELS["models/db_models.py\nImage ORM · pgvector embedding column"]
+        DEP["dependencies.py<br/>get_db · get_vision_svc · get_embed_svc"]
+        SCHEMAS["schemas/api_schemas.py<br/>ImageResponse · SearchResponse · ImageUpload"]
+        MODELS["models/db_models.py<br/>Image ORM · pgvector embedding column"]
     end
 ```
 
@@ -100,22 +100,22 @@ graph TB
 ```mermaid
 graph TB
     subgraph Services["Service Layer"]
-        VS["vision.py\nVisionService\nImage → Text description"]
-        ES["ollama_embedding.py\nOllamaEmbeddingService\nText → 4096-dim vector\nL2 norm · in-memory cache"]
-        HC["http_client.py\npost_with_retry\n3 attempts · 120s timeout"]
+        VS["vision.py<br/>VisionService<br/>Image → Text description"]
+        ES["ollama_embedding.py<br/>OllamaEmbeddingService<br/>Text → 4096-dim vector<br/>L2 norm · in-memory cache"]
+        HC["http_client.py<br/>post_with_retry<br/>3 attempts · 120s timeout"]
         VS & ES --> HC
     end
 
     subgraph Ollama["Ollama API Server (localhost:11434)"]
-        LLAVA["LLaVA\nMultimodal vision model\nGenerates descriptions"]
-        LLAMA["Llama 3.1\nEmbedding model\nText → 4096-dim vector"]
+        LLAVA["LLaVA<br/>Multimodal vision model<br/>Generates descriptions"]
+        LLAMA["Llama 3.1<br/>Embedding model<br/>Text → 4096-dim vector"]
     end
 
     subgraph Data["Data Layer"]
-        DB["database.py\nSQLAlchemy engine\nPool: 5 + 10 overflow"]
-        PG[("PostgreSQL + pgvector\nimages table\nCosine distance search")]
-        STORAGE["storage.py\nFile validation · UUID filenames"]
-        UPLOADS[("uploads/\nImage file storage")]
+        DB["database.py<br/>SQLAlchemy engine<br/>Pool: 5 + 10 overflow"]
+        PG[("PostgreSQL + pgvector<br/>images table<br/>Cosine distance search")]
+        STORAGE["storage.py<br/>File validation · UUID filenames"]
+        UPLOADS[("uploads/<br/>Image file storage")]
         DB --> PG
         STORAGE --> UPLOADS
     end
@@ -758,13 +758,13 @@ The frontend is a React application built with TypeScript and Vite, providing a 
 
 ### Frontend Technology Stack
 
-| Component  | Technology               | Purpose                    |
-|------------|--------------------------|----------------------------|
-| Framework  | React 19                 | UI component library       |
-| Language   | TypeScript               | Type-safe JavaScript       |
-| Build Tool | Vite                     | Fast HMR and bundling      |
-| Testing    | Vitest + Testing Library | Unit and integration tests |
-| Styling    | CSS Modules              | Component-scoped styles    |
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Framework | React 19 | UI component library |
+| Language | TypeScript | Type-safe JavaScript |
+| Build Tool | Vite | Fast HMR and bundling |
+| Testing | Vitest + Testing Library | Unit and integration tests |
+| Styling | CSS Modules | Component-scoped styles |
 
 ### Frontend Structure
 
