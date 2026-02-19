@@ -1,0 +1,89 @@
+/* ── App shell ─────────────────────────────────────── */
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.app-header {
+  background: #6366f1;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  height: 56px;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-header__logo {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.app-header__title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+.app-header__tagline {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  display: none;
+}
+
+@media (min-width: 540px) {
+  .app-header__tagline {
+    display: inline;
+  }
+}
+
+/* ── Nav tabs ─────────────────────────────────────── */
+.app-nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.app-nav__tab {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app-nav__tab:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.app-nav__tab--active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* ── Main content ─────────────────────────────────── */
+.app-main {
+  flex: 1;
+  background: #f8fafc;
+}
+
