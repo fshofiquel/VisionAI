@@ -31,118 +31,97 @@ VisionAI is a semantic image search engine that bridges the gap between visual c
 
 ### Technology Stack
 
-| Component       | Technology             | Purpose                              |
-|-----------------|------------------------|--------------------------------------|
-| Web Framework   | FastAPI                | REST API with automatic OpenAPI docs |
-| Database        | PostgreSQL + pgvector  | Vector similarity search             |
-| ORM             | SQLAlchemy 2.0         | Database abstraction                 |
-| Vision Model    | LLaVA (via Ollama)     | Image description generation         |
-| Embedding Model | Llama 3.1 (via Ollama) | Text-to-vector conversion            |
-| Validation      | Pydantic               | Request/response validation          |
-| Frontend        | React 19 + TypeScript  | User interface                       |
-| Build Tool      | Vite                   | Frontend bundling and dev server     |
-| Testing         | Vitest + Testing Library | Frontend unit tests                |
+| Component       | Technology               | Purpose                              |
+|-----------------|--------------------------|--------------------------------------|
+| Web Framework   | FastAPI                  | REST API with automatic OpenAPI docs |
+| Database        | PostgreSQL + pgvector    | Vector similarity search             |
+| ORM             | SQLAlchemy 2.0           | Database abstraction                 |
+| Vision Model    | LLaVA (via Ollama)       | Image description generation         |
+| Embedding Model | Llama 3.1 (via Ollama)   | Text-to-vector conversion            |
+| Validation      | Pydantic                 | Request/response validation          |
+| Frontend        | React 19 + TypeScript    | User interface                       |
+| Build Tool      | Vite                     | Frontend bundling and dev server     |
+| Testing         | Vitest + Testing Library | Frontend unit tests                  |
 
 ---
 
 ## Architecture Diagram
 
+### System Overview
+
+```mermaid
+graph LR
+    FE["React Frontend\n:5173"]
+    BE["FastAPI\n:8000"]
+    SVC["Service Layer"]
+    DATA["Data Layer"]
+    OLLAMA["Ollama\n:11434"]
+
+    FE -->|"Vite proxy"| BE
+    BE --> SVC
+    BE --> DATA
+    SVC -->|"HTTP"| OLLAMA
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              REACT FRONTEND                                 │
-│                           (localhost:5173)                                  │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐                    │
-│  │  SearchPage   │  │  UploadPage   │  │  ImageCard    │                    │
-│  │  - Query UI   │  │  - File input │  │  - Display    │                    │
-│  │  - Results    │  │  - Upload     │  │  - Score      │                    │
-│  └───────────────┘  └───────────────┘  └───────────────┘                    │
-│                            │                                                │
-│                   ┌────────┴────────┐                                       │
-│                   │  api/client.ts  │  (API Client)                         │
-│                   └────────┬────────┘                                       │
-└────────────────────────────│────────────────────────────────────────────────┘
-                             │ Vite Proxy (/api/* → :8000)
-                             ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              FASTAPI APPLICATION                            │
-│                              (localhost:8000)                               │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                           app/__init__.py                           │    │
-│  │                    Application Factory & Lifespan                   │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                       │                                     │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                         app/routers/api.py                          │    │
-│  │                                                                     │    │
-│  │   POST /api/v1/images/upload      - Upload and index image          │    │
-│  │   GET  /api/v1/images/search/text - Semantic search                 │    │
-│  │   GET  /api/v1/images/{id}        - Get image details               │    │
-│  │   DELETE /api/v1/images/{id}      - Delete image                    │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                       │                                     │
-│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐     │
-│  │  app/dependencies  │  │   app/schemas/     │  │    app/models/     │     │
-│  │    .py             │  │  api_schemas.py    │  │   db_models.py     │     │
-│  │                    │  │                    │  │                    │     │
-│  │  - get_db()        │  │  - ImageResponse   │  │  - Image (ORM)     │     │
-│  │  - get_vision_svc  │  │  - SearchResponse  │  │  - embedding col   │     │
-│  │  - get_embed_svc   │  │  - ImageUpload...  │  │  - pgvector        │     │
-│  └────────────────────┘  └────────────────────┘  └────────────────────┘     │
-└─────────────────────────────────────────────────────────────────────────────┘
-                    │                                       │
-                    ▼                                       ▼
-┌───────────────────────────────────────┐  ┌───────────────────────────────────┐
-│         SERVICE LAYER                 │  │           DATA LAYER              │
-│                                       │  │                                   │
-│  ┌─────────────────────────────────┐  │  │  ┌─────────────────────────────┐  │
-│  │   app/services/vision.py        │  │  │  │    app/database.py          │  │
-│  │                                 │  │  │  │                             │  │
-│  │   VisionService                 │  │  │  │  - SQLAlchemy engine        │  │
-│  │   - describe_image()            │  │  │  │  - Session factory          │  │
-│  │   - Image → Text description    │  │  │  │  - Connection pooling       │  │
-│  └─────────────────────────────────┘  │  │  └─────────────────────────────┘  │
-│                                       │  │                │                  │
-│  ┌─────────────────────────────────┐  │  │                ▼                  │
-│  │ app/services/ollama_embedding.py│  │  │  ┌─────────────────────────────┐  │
-│  │                                 │  │  │  │   PostgreSQL + pgvector     │  │
-│  │   OllamaEmbeddingService        │  │  │  │                             │  │
-│  │   - embed_text()                │  │  │  │  - images table             │  │
-│  │   - Text → Vector embedding     │  │  │  │  - 4096-dim vectors         │  │
-│  │   - L2 normalization            │  │  │  │  - Cosine distance search   │  │
-│  │   - In-memory caching           │  │  │  └─────────────────────────────┘  │
-│  └─────────────────────────────────┘  │  │                                   │
-│                                       │  │  ┌─────────────────────────────┐  │
-│  ┌─────────────────────────────────┐  │  │  │   app/services/storage.py   │  │
-│  │  app/services/http_client.py    │  │  │  │                             │  │
-│  │                                 │  │  │  │  - File validation          │  │
-│  │   - post_with_retry()           │  │  │  │  - UUID filename gen        │  │
-│  │   - Retry logic                 │  │  │  │  - Save/delete files        │  │
-│  │   - Timeout handling            │  │  │  └─────────────────────────────┘  │
-│  └─────────────────────────────────┘  │  │                │                  │
-│                │                      │  │                ▼                  │
-└────────────────│──────────────────────┘  │  ┌─────────────────────────────┐  │
-                 │                         │  │      uploads/ directory     │  │
-                 ▼                         │  │      (Image file storage)   │  │
-┌───────────────────────────────────────┐  │  └─────────────────────────────┘  │
-│           OLLAMA API SERVER           │  └───────────────────────────────────┘
-│         (localhost:11434)             │
-│                                       │
-│  ┌─────────────────────────────────┐  │
-│  │       LLaVA Vision Model        │  │
-│  │                                 │  │
-│  │   - Multimodal (image + text)   │  │
-│  │   - Generates descriptions      │  │
-│  │   - "The image shows a..."      │  │
-│  └─────────────────────────────────┘  │
-│                                       │
-│  ┌─────────────────────────────────┐  │
-│  │     Llama 3.1 Embedding Model   │  │
-│  │                                 │  │
-│  │   - Text → 4096-dim vector      │  │
-│  │   - Semantic meaning capture    │  │
-│  │   - Similarity comparisons      │  │
-│  └─────────────────────────────────┘  │
-└───────────────────────────────────────┘
+
+### Frontend Layer
+
+```mermaid
+graph LR
+    SP[SearchPage] -->|search query| AC
+    UP[UploadPage] -->|file + description| AC
+    IC[ImageCard] -->|renders results from| AC
+    AC["api/client.ts\nAPI Client"]
+    AC -->|"/api/v1/*"| BE["FastAPI :8000"]
+```
+
+### FastAPI Application Layer
+
+```mermaid
+graph TB
+    APP["app/__init__.py\nApplication Factory"] --> ROUTER
+
+    ROUTER["routers/api.py"]
+    ROUTER --> R1["POST /api/v1/images/upload"]
+    ROUTER --> R2["GET  /api/v1/images/search/text"]
+    ROUTER --> R3["GET  /api/v1/images/{id}"]
+    ROUTER --> R4["DELETE /api/v1/images/{id}"]
+
+    R1 & R2 & R3 & R4 --> DEP
+
+    subgraph Support["Supporting Modules"]
+        DEP["dependencies.py\nget_db · get_vision_svc · get_embed_svc"]
+        SCHEMAS["schemas/api_schemas.py\nImageResponse · SearchResponse · ImageUpload"]
+        MODELS["models/db_models.py\nImage ORM · pgvector embedding column"]
+    end
+```
+
+### Service & Data Layers
+
+```mermaid
+graph TB
+    subgraph Services["Service Layer"]
+        VS["vision.py\nVisionService\nImage → Text description"]
+        ES["ollama_embedding.py\nOllamaEmbeddingService\nText → 4096-dim vector\nL2 norm · in-memory cache"]
+        HC["http_client.py\npost_with_retry\n3 attempts · 120s timeout"]
+        VS & ES --> HC
+    end
+
+    subgraph Ollama["Ollama API Server (localhost:11434)"]
+        LLAVA["LLaVA\nMultimodal vision model\nGenerates descriptions"]
+        LLAMA["Llama 3.1\nEmbedding model\nText → 4096-dim vector"]
+    end
+
+    subgraph Data["Data Layer"]
+        DB["database.py\nSQLAlchemy engine\nPool: 5 + 10 overflow"]
+        PG[("PostgreSQL + pgvector\nimages table\nCosine distance search")]
+        STORAGE["storage.py\nFile validation · UUID filenames"]
+        UPLOADS[("uploads/\nImage file storage")]
+        DB --> PG
+        STORAGE --> UPLOADS
+    end
+
+    HC -->|"/api/generate"| LLAVA
+    HC -->|"/api/embeddings"| LLAMA
 ```
 
 ---
@@ -226,17 +205,13 @@ FastAPI's dependency system provides:
 
 ### Image Upload Flow
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Client  │────▶│ Validate │────▶│ Describe │────▶│  Embed   │────▶│  Store   │
-│  Upload  │     │  Image   │     │  (LLaVA) │     │  (Llama) │     │   DB     │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘     └──────────┘
-     │                │                │                │                │
-     │                │                │                │                │
-   Image          Check type       Generate         Convert          Save file,
-   file           and size        "The image       description       metadata,
-                                  shows..."        to 4096-dim       and vector
-                                                   vector
+```mermaid
+flowchart LR
+    A["Client<br/>Upload"] -->|"Image file"| B["Validate<br/>Image"]
+    B -->|"Check type<br/>and size"| C["Describe<br/>(LLaVA)"]
+    C -->|"Generate<br/>'The image shows...'"| D["Embed<br/>(Llama)"]
+    D -->|"Convert description<br/>to 4096-dim vector"| E["Store<br/>DB"]
+    E -->|"Save file,<br/>metadata & vector"| F([Done])
 ```
 
 **Detailed Steps:**
@@ -256,17 +231,13 @@ FastAPI's dependency system provides:
 
 ### Search Flow
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Search  │────▶│  Expand  │────▶│  Embed   │────▶│  Hybrid  │────▶│  Return  │
-│  Query   │     │  Query   │     │  Query   │     │  Search  │     │ Results  │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘     └──────────┘
-     │                │                │                │                │
-     │                │                │                │                │
-   "dog"         "an image        Convert to       Vector search     Ranked
-                 showing dog"     4096-dim +       + keyword         results
-                                  vector           injection +       with
-                                                   boosting          scores
+```mermaid
+flowchart LR
+    A["Search<br/>Query"] -->|"'dog'"| B["Expand<br/>Query"]
+    B -->|"'an image<br/>showing dog'"| C["Embed<br/>Query"]
+    C -->|"Convert to<br/>4096-dim vector"| D["Hybrid<br/>Search"]
+    D -->|"Vector search +<br/>keyword injection +<br/>boosting"| E["Return<br/>Results"]
+    E --> F(["Ranked results<br/>with scores"])
 ```
 
 ---
@@ -287,25 +258,18 @@ Pure vector similarity search has limitations:
 
 ### Algorithm Overview
 
-```
-Input: User query string (e.g., "dog")
-Output: Ranked list of (image, score) pairs
+```mermaid
+flowchart TD
+    IN([User query string<br/>e.g. 'dog']) --> S1
 
-1. EXPAND QUERY
-   - Transform short queries to match description embedding style
-   
-2. EXTRACT KEYWORDS
-   - Pull meaningful search terms for boosting
-   
-3. VECTOR SEARCH
-   - Find semantically similar images via cosine similarity
-   
-4. KEYWORD INJECTION
-   - Fetch images containing keywords in descriptions
-   
-5. SCORE & RANK
-   - Combine vector scores with keyword boosts
-   - Sort by final score
+    S1["1. EXPAND QUERY<br/>Transform short queries to match<br/>description embedding style"]
+    S2["2. EXTRACT KEYWORDS<br/>Pull meaningful search terms<br/>for boosting"]
+    S3["3. VECTOR SEARCH<br/>Find semantically similar images<br/>via cosine similarity"]
+    S4["4. KEYWORD INJECTION<br/>Fetch images containing<br/>keywords in descriptions"]
+    S5["5. SCORE & RANK<br/>Combine vector scores with<br/>keyword boosts, sort by final score"]
+
+    S1 --> S2 --> S3 --> S4 --> S5
+    S5 --> OUT([Ranked list of<br/>image + score pairs])
 ```
 
 ### Step 1: Query Expansion
@@ -794,13 +758,13 @@ The frontend is a React application built with TypeScript and Vite, providing a 
 
 ### Frontend Technology Stack
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Framework | React 19 | UI component library |
-| Language | TypeScript | Type-safe JavaScript |
-| Build Tool | Vite | Fast HMR and bundling |
-| Testing | Vitest + Testing Library | Unit and integration tests |
-| Styling | CSS Modules | Component-scoped styles |
+| Component  | Technology               | Purpose                    |
+|------------|--------------------------|----------------------------|
+| Framework  | React 19                 | UI component library       |
+| Language   | TypeScript               | Type-safe JavaScript       |
+| Build Tool | Vite                     | Fast HMR and bundling      |
+| Testing    | Vitest + Testing Library | Unit and integration tests |
+| Styling    | CSS Modules              | Component-scoped styles    |
 
 ### Frontend Structure
 
@@ -813,26 +777,16 @@ frontend/
 │   │
 │   ├── api/
 │   │   └── client.ts         # Backend API client
-│   │                         # Exports:
-│   │                         #   - uploadImage(file, description?)
-│   │                         #   - searchImages(query, limit?, minScore?)
-│   │                         #   - getImage(id)
-│   │                         #   - deleteImage(id)
-│   │                         #   - imageUrl(filename)
 │   │
 │   ├── components/
 │   │   ├── ImageCard.tsx     # Reusable image display component
-│   │   └── ImageCard.css     # - Shows thumbnail, score, description
+│   │   └── ImageCard.css
 │   │
 │   ├── pages/
 │   │   ├── SearchPage.tsx    # Natural language search interface
-│   │   ├── SearchPage.css    # - Query input
-│   │   │                     # - Results grid
-│   │   │                     # - Score display
+│   │   ├── SearchPage.css
 │   │   ├── UploadPage.tsx    # Image upload interface
-│   │   └── UploadPage.css    # - File selection
-│   │                         # - Optional description
-│   │                         # - Upload status
+│   │   └── UploadPage.css
 │   │
 │   └── test/
 │       └── setup.ts          # Test configuration for Vitest
@@ -922,7 +876,6 @@ Handles image upload with AI processing:
 Type-safe API client with full TypeScript interfaces:
 
 ```typescript
-// Type definitions
 interface ImageSearchResult {
   id: number;
   filename: string;
@@ -938,7 +891,6 @@ interface SearchResponse {
   total: number;
 }
 
-// API functions
 export async function searchImages(
   q: string,
   limit = 20,
@@ -957,7 +909,6 @@ export async function searchImages(
   return res.json();
 }
 
-// Image URL helper
 export function imageUrl(filename: string): string {
   return `/static/uploads/${filename}`;
 }
@@ -965,23 +916,16 @@ export function imageUrl(filename: string): string {
 
 ### Frontend-Backend Communication Flow
 
-```
-┌──────────────────┐         ┌──────────────────┐         ┌──────────────────┐
-│   React App      │         │   Vite Dev       │         │   FastAPI        │
-│   (Browser)      │         │   Server         │         │   Backend        │
-│   :5173          │         │   (Proxy)        │         │   :8000          │
-└────────┬─────────┘         └────────┬─────────┘         └────────┬─────────┘
-         │                            │                            │
-         │  fetch('/api/v1/...')      │                            │
-         │ ──────────────────────────>│                            │
-         │                            │  HTTP request              │
-         │                            │ ──────────────────────────>│
-         │                            │                            │
-         │                            │  JSON response             │
-         │                            │ <──────────────────────────│
-         │  JSON data                 │                            │
-         │ <──────────────────────────│                            │
-         │                            │                            │
+```mermaid
+sequenceDiagram
+    participant Browser as React App (Browser :5173)
+    participant Vite as Vite Dev Server (Proxy)
+    participant API as FastAPI Backend (:8000)
+
+    Browser->>Vite: fetch('/api/v1/...')
+    Vite->>API: HTTP request
+    API-->>Vite: JSON response
+    Vite-->>Browser: JSON data
 ```
 
 ### Running the Frontend
@@ -1101,4 +1045,3 @@ TIMEOUT = 120                    # Seconds
 MAX_RETRIES = 3                  # Retry attempts
 RETRY_DELAY = 5                  # Seconds between retries
 ```
-
