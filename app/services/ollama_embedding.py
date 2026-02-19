@@ -91,7 +91,7 @@ class OllamaEmbeddingService:
             RuntimeError: If embedding fails after all retries
         """
         # Generate cache key from text hash
-        cache_key = hashlib.md5(text.encode()).hexdigest()
+        cache_key = hashlib.sha256(text.encode()).hexdigest()
 
         # Return cached embedding if available
         if use_cache and cache_key in _embedding_cache:

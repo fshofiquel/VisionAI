@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # PostgreSQL connection string (requires pgvector extension)
     visionai_database_url: str = (
-        "postgresql+psycopg://postgres:1337@localhost:5432/visionai_db"
+        "postgresql+psycopg://postgres:changeme@localhost:5432/visionai_db"
     )
 
     # ==========================================================================
