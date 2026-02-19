@@ -12,47 +12,14 @@ VisionAI is a semantic image search engine that allows you to find images using 
 - ⚡ **Hybrid Search** - Combines vector similarity with keyword matching for 86% accuracy
 - 🚀 **Fast & Scalable** - PostgreSQL with pgvector for efficient similarity search
 - 📦 **Simple REST API** - Easy integration with any application
-
-## Architecture
-
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   FastAPI App   │────▶│   Ollama API    │────▶│  LLaVA Model    │
-│   (REST API)    │     │   (localhost)   │     │  (Vision + LLM) │
-└────────┬────────┘     └─────────────────┘     └─────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│   PostgreSQL    │
-│   + pgvector    │
-│  (Embeddings)   │
-└─────────────────┘
-```
-
-### How It Works
-
-1. **Upload**: Image is uploaded via REST API
-2. **Describe**: LLaVA vision model generates a text description
-3. **Embed**: Description is converted to a 4096-dimensional vector
-4. **Index**: Vector is stored in PostgreSQL with pgvector
-5. **Search**: Query is expanded, embedded, and matched using hybrid search
-
-### Hybrid Search Algorithm
-
-VisionAI uses a sophisticated hybrid search that achieves **86% high-confidence matches**:
-
-1. **Query Expansion** - Short queries are expanded to match description style
-   - `"dog"` → `"an image showing dog"`
-2. **Vector Search** - Cosine similarity on embeddings
-3. **Keyword Injection** - Direct SQL ILIKE search for keyword matches
-4. **Keyword Boosting** - Up to +0.5 score for keyword presence
-5. **Re-ranking** - Final sort by combined score
+- 🎨 **Modern React Frontend** - Clean, responsive UI for search and upload
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.14+
+- Node.js 18+ (for frontend)
 - PostgreSQL 12+ with pgvector extension
 - Ollama with LLaVA model
 
@@ -78,7 +45,7 @@ CREATE DATABASE visionai_db;
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-### 3. Install VisionAI
+### 3. Install Backend
 
 #### Option A: Using pip (Recommended for PyCharm)
 
@@ -113,29 +80,14 @@ cd visionai
 uv sync
 ```
 
-#### Option C: PyCharm Setup
+### 4. Install Frontend
 
-1. **Clone the repository** using PyCharm:
-   - File → New → Project from Version Control
-   - Enter the repository URL
+```bash
+cd frontend
+npm install
+```
 
-2. **Configure the Python interpreter**:
-   - File → Settings → Project → Python Interpreter
-   - Click the gear icon → Add Interpreter → Add Local Interpreter
-   - Select "Virtualenv Environment" → "New"
-   - Choose Python 3.10+ as the base interpreter
-   - Click OK
-
-3. **Install dependencies**:
-   - Open the terminal in PyCharm (View → Tool Windows → Terminal)
-   - Run: `pip install -r requirements.txt`
-
-4. **Configure run configuration**:
-   - Run → Edit Configurations → Add New → Python
-   - Script path: `main.py`
-   - Or use the uvicorn command: `uvicorn main:app --reload`
-
-### 4. Configure Environment
+### 5. Configure Environment
 
 Copy the example environment file and update with your settings:
 
@@ -158,11 +110,27 @@ OLLAMA_EMBEDDING_DIMENSION=4096
 UPLOAD_DIR=uploads
 ```
 
-### 5. Run the Server
+### 6. Run the Application
 
+**Terminal 1 - Backend:**
 ```bash
 uvicorn main:app --reload
 ```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+**Access the application:**
+
+| Component | URL |
+|-----------|-----|
+| Frontend UI | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| API Docs (ReDoc) | http://localhost:8000/redoc |
 
 ## API Reference
 
@@ -187,7 +155,7 @@ Content-Type: multipart/form-data
     "filename": "abc123.jpg",
     "original_filename": "photo.jpg",
     "description": "The image shows a golden retriever...",
-    "created_at": "2025-02-16T10:30:00Z"
+    "created_at": "2026-02-19T10:30:00Z"
   }
 }
 ```
@@ -236,26 +204,67 @@ DELETE /api/v1/images/{image_id}
 
 ```
 VisionAI/
-├── main.py                 # Application entry point
-├── pyproject.toml          # Dependencies
-├── .env                    # Configuration
-├── app/
-│   ├── __init__.py         # FastAPI app factory
-│   ├── config.py           # Settings management
-│   ├── database.py         # SQLAlchemy setup
-│   ├── dependencies.py     # Dependency injection
-│   ├── models/
-│   │   └── db_models.py    # Image ORM model
-│   ├── schemas/
-│   │   └── api_schemas.py  # Pydantic schemas
-│   ├── routers/
-│   │   └── api.py          # API endpoints
-│   └── services/
-│       ├── http_client.py  # Ollama HTTP client
-│       ├── vision.py       # Image description service
-│       ├── ollama_embedding.py  # Text embedding service
-│       └── storage.py      # File storage utilities
-└── uploads/                # Uploaded images
+├── main.py                     # Backend entry point (uvicorn target)
+├── pyproject.toml              # Python project metadata and dependencies
+├── requirements.txt            # Pip-compatible dependencies
+├── .env                        # Environment configuration (not in git)
+├── .env.example                # Example environment template
+├── ARCHITECTURE.md             # Detailed technical documentation
+│
+├── app/                        # Backend application package
+│   ├── __init__.py             # FastAPI app factory and lifespan
+│   ├── config.py               # Pydantic settings management
+│   ├── database.py             # SQLAlchemy engine and session setup
+│   ├── dependencies.py         # FastAPI dependency injection
+│   │
+│   ├── models/                 # Database models
+│   │   ├── __init__.py         # Exports Image model
+│   │   └── db_models.py        # SQLAlchemy ORM model with pgvector
+│   │
+│   ├── schemas/                # API data schemas
+│   │   ├── __init__.py         # Exports all schemas
+│   │   └── api_schemas.py      # Pydantic request/response models
+│   │
+│   ├── routers/                # API route handlers
+│   │   ├── __init__.py         # Exports router
+│   │   └── api.py              # Image upload, search, CRUD endpoints
+│   │
+│   └── services/               # Business logic services
+│       ├── __init__.py         # Exports all services
+│       ├── http_client.py      # Ollama API client with retry logic
+│       ├── vision.py           # Image description generation (LLaVA)
+│       ├── ollama_embedding.py # Text embedding service
+│       └── storage.py          # File validation and storage
+│
+├── frontend/                   # React frontend application
+│   ├── package.json            # Node.js dependencies and scripts
+│   ├── vite.config.ts          # Vite configuration with API proxy
+│   ├── tsconfig.json           # TypeScript configuration
+│   │
+│   ├── src/
+│   │   ├── main.tsx            # React entry point
+│   │   ├── App.tsx             # Main app component with navigation
+│   │   ├── App.css             # Global styles
+│   │   │
+│   │   ├── api/
+│   │   │   └── client.ts       # API client for backend communication
+│   │   │
+│   │   ├── components/
+│   │   │   ├── ImageCard.tsx   # Image display card component
+│   │   │   └── ImageCard.css
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── SearchPage.tsx  # Search interface
+│   │   │   ├── SearchPage.css
+│   │   │   ├── UploadPage.tsx  # Upload interface
+│   │   │   └── UploadPage.css
+│   │   │
+│   │   └── test/               # Frontend tests
+│   │       └── setup.ts
+│   │
+│   └── public/                 # Static assets
+│
+└── uploads/                    # Uploaded image storage (not in git)
 ```
 
 ## Configuration
@@ -269,10 +278,13 @@ VisionAI/
 | `OLLAMA_EMBEDDING_MODEL` | Embedding model | `llama3.1:latest` |
 | `OLLAMA_EMBEDDING_DIMENSION` | Vector dimension | `4096` |
 
-## API Documentation
+## Documentation
 
-Once running, visit:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed technical documentation covering system architecture, the hybrid search algorithm, and implementation details.
+- **Swagger UI** - http://localhost:8000/docs (interactive API documentation)
+- **ReDoc** - http://localhost:8000/redoc (alternative API documentation)
 
+## License
+
+MIT License
 
