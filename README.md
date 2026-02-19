@@ -80,6 +80,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ### 3. Install VisionAI
 
+#### Option A: Using pip (Recommended for PyCharm)
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/visionai.git
@@ -87,16 +89,65 @@ cd visionai
 
 # Create virtual environment
 python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# or: .venv\Scripts\activate  # Windows
+
+# Activate virtual environment
+# Linux/Mac:
+source .venv/bin/activate
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Windows CMD:
+.venv\Scripts\activate.bat
 
 # Install dependencies
-pip install -e .
+pip install -r requirements.txt
 ```
+
+#### Option B: Using uv (Faster)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/visionai.git
+cd visionai
+
+# Install with uv (creates .venv automatically)
+uv sync
+```
+
+#### Option C: PyCharm Setup
+
+1. **Clone the repository** using PyCharm:
+   - File → New → Project from Version Control
+   - Enter the repository URL
+
+2. **Configure the Python interpreter**:
+   - File → Settings → Project → Python Interpreter
+   - Click the gear icon → Add Interpreter → Add Local Interpreter
+   - Select "Virtualenv Environment" → "New"
+   - Choose Python 3.10+ as the base interpreter
+   - Click OK
+
+3. **Install dependencies**:
+   - Open the terminal in PyCharm (View → Tool Windows → Terminal)
+   - Run: `pip install -r requirements.txt`
+
+4. **Configure run configuration**:
+   - Run → Edit Configurations → Add New → Python
+   - Script path: `main.py`
+   - Or use the uvicorn command: `uvicorn main:app --reload`
 
 ### 4. Configure Environment
 
-Create a `.env` file:
+Copy the example environment file and update with your settings:
+
+```bash
+# Linux/Mac
+cp .env.example .env
+
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+Edit `.env` with your database credentials:
 
 ```env
 VISIONAI_DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/visionai_db

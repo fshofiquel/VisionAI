@@ -1,0 +1,31 @@
+i was # VisionAI Dependencies
+# Generated from pyproject.toml for pip/PyCharm compatibility
+#
+# Requirements: Python 3.14+
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Note: For uv users, use `uv sync` instead
+
+# Web Framework
+fastapi[standard]>=0.109.0
+uvicorn>=0.27.0
+
+# Database
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+pgvector>=0.3
+
+# Image Processing
+Pillow>=10.0
+
+# Configuration & Validation
+pydantic-settings>=2.0
+python-multipart>=0.0.9
+
+# HTTP & Data
+requests>=2.31
+numpy>=1.26
+
+
