@@ -34,8 +34,6 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI application instance
     """
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
-
     app = FastAPI(
         title="VisionAI",
         description="AI-powered image search using LLaVA descriptions and Ollama embeddings",
@@ -59,7 +57,3 @@ def create_app() -> FastAPI:
         return {"message": "VisionAI API is running"}
 
     return app
-
-
-# Create the app instance
-app = create_app()

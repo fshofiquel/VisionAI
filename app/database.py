@@ -54,5 +54,3 @@ class Base(DeclarativeBase):
     All database models should inherit from this class to be properly
     registered with SQLAlchemy's metadata system.
     """
-
-    pass
